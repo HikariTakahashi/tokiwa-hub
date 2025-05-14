@@ -21,38 +21,37 @@
           class="border border-gray-200 rounded-lg mb-3 overflow-hidden"
         >
           <div
-            class="p-4 bg-gray-100 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
+            class="p-2 md:p-4 bg-gray-100 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
             @click="toggleIssue(repo.name, issue.id)"
           >
             <div class="flex items-center gap-2">
               <span
-                class="px-2 py-1 text-xs rounded-full text-white font-bold"
+                class="px-1.5 md:px-2 py-1 text-xs rounded-full text-white font-bold"
                 :class="{
-                  'bg-green-500 ': issue.type === 'pull_request',
-                  'bg-blue-500': issue.type === 'issue',
+                  'bg-green-500 min-w-14': issue.type === 'pull_request',
+                  'bg-blue-500 min-w-16': issue.type === 'issue',
                 }"
               >
                 {{ issue.type === "pull_request" ? "PR" : "Issue" }} #{{
                   issue.number
                 }}
               </span>
-              <h4 class="font-medium">{{ issue.title }}</h4>
+              <h4 class="text-xs md:text-base font-medium">
+                {{ issue.title }}
+              </h4>
             </div>
-            <div class="flex items-center gap-8">
+            <div class="flex items-center gap-2 md:gap-8 max-w-12 md:max-w-xl">
               <a
                 :href="`https://github.com/${repo.owner}/${repo.name}/${
                   issue.type === 'pull_request' ? 'pull' : 'issues'
                 }/${issue.number}`"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                class="px-3 py-1 text-xs md:text-sm bg-gray-200 hover:bg-gray-300 rounded transition-colors"
                 @click.stop
               >
                 GitHubで見る
               </a>
-              <span class="text-xs text-gray-500">{{
-                isOpen(repo.name, issue.id) ? "▼" : "▶"
-              }}</span>
             </div>
           </div>
           <div
@@ -62,7 +61,7 @@
             <div
               class="prose prose-sm max-w-none prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-700 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:text-sm prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-100 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-gray-500"
               v-html="renderMarkdown(issue.body)"
-            ></div>
+            />
             <div
               v-if="issue.images && issue.images.length > 0"
               class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"
