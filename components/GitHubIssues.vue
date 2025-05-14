@@ -1,37 +1,61 @@
 <template>
-  <div class="github-issues">
-    <div v-for="repo in repositories" :key="repo.name" class="repo-section">
-      <h3>{{ repo.name }}</h3>
-      <div v-if="repo.issues.length === 0" class="no-issues">
-        このリポジトリにはissueがありません。
+  <div class="max-w-3xl mx-auto p-5">
+    <div v-for="repo in repositories" :key="repo.name" class="mb-8">
+      <h3 class="text-xl font-semibold mb-4">{{ repo.name }}</h3>
+      <div v-if="repo.issues.length === 0" class="p-4 text-gray-500 italic">
+        このリポジトリにはissueとpull requestがありません。
       </div>
-      <div
-        v-else
-        v-for="issue in repo.issues"
-        :key="issue.id"
-        class="issue-card"
-      >
-        <div class="issue-header" @click="toggleIssue(repo.name, issue.id)">
-          <h4>{{ issue.title }}</h4>
-          <span class="toggle-icon">{{
-            isOpen(repo.name, issue.id) ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-if="isOpen(repo.name, issue.id)" class="issue-content">
-          <div class="markdown-body" v-html="renderMarkdown(issue.body)"></div>
+      <template v-else>
+        <div
+          v-for="issue in repo.issues"
+          :key="issue.id"
+          class="border border-gray-200 rounded-lg mb-3 overflow-hidden"
+        >
           <div
-            v-if="issue.images && issue.images.length > 0"
-            class="issue-images"
+            class="p-4 bg-gray-100 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
+            @click="toggleIssue(repo.name, issue.id)"
           >
-            <img
-              v-for="(image, index) in issue.images"
-              :key="index"
-              :src="image"
-              :alt="`Issue image ${index + 1}`"
-            />
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2 py-1 text-xs rounded-full text-white font-bold"
+                :class="{
+                  'bg-green-500 ': issue.type === 'pull_request',
+                  'bg-blue-500': issue.type === 'issue',
+                }"
+              >
+                {{ issue.type === "pull_request" ? "PR" : "Issue" }} #{{
+                  issue.number
+                }}
+              </span>
+              <h4 class="font-medium">{{ issue.title }}</h4>
+            </div>
+            <span class="text-xs text-gray-500">{{
+              isOpen(repo.name, issue.id) ? "▼" : "▶"
+            }}</span>
+          </div>
+          <div
+            v-if="isOpen(repo.name, issue.id)"
+            class="p-4 border-t border-gray-200"
+          >
+            <div
+              class="prose prose-sm max-w-none prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-700 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:text-sm prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-100 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-gray-500"
+              v-html="renderMarkdown(issue.body)"
+            ></div>
+            <div
+              v-if="issue.images && issue.images.length > 0"
+              class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"
+            >
+              <img
+                v-for="(image, index) in issue.images"
+                :key="index"
+                :src="image"
+                :alt="`Issue image ${index + 1}`"
+                class="w-full h-auto rounded"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -39,29 +63,51 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { Octokit } from "@octokit/rest";
-import { marked } from "marked";
+import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
+
+interface Issue {
+  id: number;
+  title: string;
+  body: string;
+  images: string[];
+  type: "issue" | "pull_request";
+  number: number;
+}
+
+interface Repository {
+  name: string;
+  owner: string;
+  link: string;
+  issues: Issue[];
+}
 
 const octokit = new Octokit();
+const md = new MarkdownIt();
 
-const repositories = ref([
+const repositories = ref<Repository[]>([
   {
     name: "tokiwa-calendar-frontend",
     owner: "HikariTakahashi",
+    link: "https://github.com/HikariTakahashi/tokiwa-calendar-frontend",
     issues: [],
   },
   {
     name: "tokiwa-calendar-backend",
     owner: "HikariTakahashi",
+    link: "https://github.com/HikariTakahashi/tokiwa-calendar-backend",
     issues: [],
   },
   {
     name: "tokiwa-calendar-hardware",
     owner: "HikariTakahashi",
+    link: "https://github.com/HikariTakahashi/tokiwa-calendar-hardware",
     issues: [],
   },
   {
     name: "tokiwa-calendar-discordbot",
     owner: "HikariTakahashi",
+    link: "https://github.com/HikariTakahashi/tokiwa-calendar-discordbot",
     issues: [],
   },
 ]);
@@ -78,7 +124,8 @@ const toggleIssue = (repoName: string, issueId: number) => {
 };
 
 const renderMarkdown = (content: string) => {
-  return marked(content || "");
+  const rawHtml = md.render(content || "");
+  return DOMPurify.sanitize(rawHtml);
 };
 
 const extractImages = (body: string) => {
@@ -94,18 +141,42 @@ const extractImages = (body: string) => {
 const fetchIssues = async () => {
   for (const repo of repositories.value) {
     try {
-      const response = await octokit.issues.listForRepo({
-        owner: repo.owner,
-        repo: repo.name,
-        state: "open",
-      });
+      const [issuesResponse, pullsResponse] = await Promise.all([
+        octokit.issues.listForRepo({
+          owner: repo.owner,
+          repo: repo.name,
+          state: "open",
+        }),
+        octokit.pulls.list({
+          owner: repo.owner,
+          repo: repo.name,
+          state: "open",
+        }),
+      ]);
 
-      repo.issues = response.data.map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        body: issue.body || "",
-        images: extractImages(issue.body || ""),
+      const issues = issuesResponse.data
+        .filter((issue) => !issue.pull_request)
+        .map((issue) => ({
+          id: issue.id,
+          title: issue.title,
+          body: issue.body || "",
+          images: extractImages(issue.body || ""),
+          type: "issue" as const,
+          number: issue.number,
+        }));
+
+      const pullRequests = pullsResponse.data.map((pr) => ({
+        id: pr.id,
+        title: pr.title,
+        body: pr.body || "",
+        images: extractImages(pr.body || ""),
+        type: "pull_request" as const,
+        number: pr.number,
       }));
+
+      repo.issues = [...issues, ...pullRequests].sort(
+        (a, b) => b.number - a.number
+      );
     } catch (error) {
       console.error(`Error fetching issues for ${repo.name}:`, error);
     }
@@ -116,151 +187,3 @@ onMounted(() => {
   fetchIssues();
 });
 </script>
-
-<style scoped>
-.github-issues {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.repo-section {
-  margin-bottom: 30px;
-}
-
-.issue-card {
-  border: 1px solid #e1e4e8;
-  border-radius: 6px;
-  margin-bottom: 10px;
-  overflow: hidden;
-}
-
-.issue-header {
-  padding: 15px;
-  background-color: #f6f8fa;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.issue-header:hover {
-  background-color: #f1f3f5;
-}
-
-.issue-content {
-  padding: 15px;
-  border-top: 1px solid #e1e4e8;
-}
-
-.issue-images {
-  margin-top: 15px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.issue-images img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-}
-
-.markdown-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
-    sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  word-wrap: break-word;
-}
-
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3),
-.markdown-body :deep(h4),
-.markdown-body :deep(h5),
-.markdown-body :deep(h6) {
-  margin-top: 24px;
-  margin-bottom: 16px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.markdown-body :deep(p) {
-  margin-top: 0;
-  margin-bottom: 16px;
-}
-
-.markdown-body :deep(code) {
-  padding: 0.2em 0.4em;
-  margin: 0;
-  font-size: 85%;
-  background-color: rgba(27, 31, 35, 0.05);
-  border-radius: 3px;
-}
-
-.markdown-body :deep(pre) {
-  padding: 16px;
-  overflow: auto;
-  font-size: 85%;
-  line-height: 1.45;
-  background-color: #f6f8fa;
-  border-radius: 3px;
-}
-
-.markdown-body :deep(blockquote) {
-  padding: 0 1em;
-  color: #6a737d;
-  border-left: 0.25em solid #dfe2e5;
-  margin: 0 0 16px 0;
-}
-
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  padding-left: 2em;
-  margin-top: 0;
-  margin-bottom: 16px;
-}
-
-.markdown-body :deep(table) {
-  display: block;
-  width: 100%;
-  overflow: auto;
-  margin-top: 0;
-  margin-bottom: 16px;
-  border-spacing: 0;
-  border-collapse: collapse;
-}
-
-.markdown-body :deep(table th),
-.markdown-body :deep(table td) {
-  padding: 6px 13px;
-  border: 1px solid #dfe2e5;
-}
-
-.markdown-body :deep(table tr) {
-  background-color: #fff;
-  border-top: 1px solid #c6cbd1;
-}
-
-.markdown-body :deep(table tr:nth-child(2n)) {
-  background-color: #f6f8fa;
-}
-
-.markdown-body :deep(img) {
-  max-width: 100%;
-  box-sizing: content-box;
-  background-color: #fff;
-}
-
-.toggle-icon {
-  font-size: 12px;
-  color: #586069;
-}
-
-.no-issues {
-  padding: 15px;
-  color: #586069;
-  font-style: italic;
-}
-</style>
