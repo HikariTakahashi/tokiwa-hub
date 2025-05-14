@@ -1,7 +1,16 @@
 <template>
   <div class="max-w-3xl mx-auto p-5">
     <div v-for="repo in repositories" :key="repo.name" class="mb-8">
-      <h3 class="text-xl font-semibold mb-4">{{ repo.name }}</h3>
+      <h3 class="text-xl font-semibold mb-4">
+        <a
+          :href="repo.link"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-blue-600 transition-colors"
+        >
+          {{ repo.name }}
+        </a>
+      </h3>
       <div v-if="repo.issues.length === 0" class="p-4 text-gray-500 italic">
         このリポジトリにはissueとpull requestがありません。
       </div>
@@ -29,9 +38,22 @@
               </span>
               <h4 class="font-medium">{{ issue.title }}</h4>
             </div>
-            <span class="text-xs text-gray-500">{{
-              isOpen(repo.name, issue.id) ? "▼" : "▶"
-            }}</span>
+            <div class="flex items-center gap-8">
+              <a
+                :href="`https://github.com/${repo.owner}/${repo.name}/${
+                  issue.type === 'pull_request' ? 'pull' : 'issues'
+                }/${issue.number}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                @click.stop
+              >
+                GitHubで見る
+              </a>
+              <span class="text-xs text-gray-500">{{
+                isOpen(repo.name, issue.id) ? "▼" : "▶"
+              }}</span>
+            </div>
           </div>
           <div
             v-if="isOpen(repo.name, issue.id)"
