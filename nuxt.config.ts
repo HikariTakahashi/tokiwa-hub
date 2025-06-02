@@ -7,7 +7,6 @@ export default defineNuxtConfig({
     "@nuxt/icon",
     "@kgierke/nuxt-basic-auth",
     "@nuxtjs/tailwindcss",
-    "@nuxt/ui",
   ],
   basicAuth: {
     enabled: true,
