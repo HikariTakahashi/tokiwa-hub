@@ -21,10 +21,10 @@
           class="border border-gray-200 rounded-lg mb-3 overflow-hidden"
         >
           <div
-            class="p-2 md:p-4 bg-gray-100 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
+            class="md:p-2 bg-gray-100 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
             @click="toggleIssue(issue.id)"
           >
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 max-w-40 md:max-w-none">
               <span
                 class="px-1.5 md:px-2 py-1 text-xs rounded-full text-white font-bold"
                 :class="{
@@ -40,21 +40,35 @@
                 {{ issue.title }}
               </h4>
             </div>
-            <div class="flex items-center gap-2 md:gap-8 max-w-12 md:max-w-xl">
+
+            <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2">
+                <img
+                  v-for="assignee in issue.assignees"
+                  :key="assignee.login"
+                  :src="assignee.avatar_url"
+                  :alt="assignee.login"
+                  class="w-6 h-6 rounded-full"
+                />
+              </div>
+              <div class="flex items-center gap-2" />
               <a
                 :href="`https://github.com/${owner}/${name}/${
                   issue.type === 'pull_request' ? 'pull' : 'issues'
                 }/${issue.number}`"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="px-3 py-1 text-xs md:text-sm bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                class="p-1.5 pb-0.5 text-xs md:text-sm bg-gray-200 hover:bg-gray-300 rounded transition-colors"
                 @click.stop
               >
-                GitHubで見る
+                <Icon name="grommet-icons:github" class="size-6" />
               </a>
             </div>
           </div>
           <div v-if="isOpen(issue.id)" class="p-4 border-t border-gray-200">
+            <h6 v-for="assignee in issue.assignees" :key="assignee.login">
+              担当者:{{ assignee.login }}
+            </h6>
             <div
               class="prose prose-sm max-w-none prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-700 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:text-sm prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-100 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-gray-500"
               v-html="renderMarkdown(issue.body)"
@@ -91,6 +105,10 @@ interface Issue {
   images: string[];
   type: "issue" | "pull_request";
   number: number;
+  assignees: {
+    login: string;
+    avatar_url: string;
+  }[];
 }
 
 const props = defineProps<{
@@ -152,6 +170,10 @@ const fetchIssues = async () => {
         images: extractImages(issue.body || ""),
         type: "issue" as const,
         number: issue.number,
+        assignees: (issue.assignees || []).map((assignee) => ({
+          login: assignee.login,
+          avatar_url: assignee.avatar_url,
+        })),
       }));
 
     const pullRequests = pullsResponse.data.map((pr) => ({
@@ -161,6 +183,10 @@ const fetchIssues = async () => {
       images: extractImages(pr.body || ""),
       type: "pull_request" as const,
       number: pr.number,
+      assignees: (pr.assignees || []).map((assignee) => ({
+        login: assignee.login,
+        avatar_url: assignee.avatar_url,
+      })),
     }));
 
     issues.value = [...issuesList, ...pullRequests].sort(
